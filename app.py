@@ -2,7 +2,7 @@ import streamlit as st
 import os
 import io
 import zipfile
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from docxtpl import DocxTemplate
 
 st.set_page_config(page_title="양식 자동 변환기", layout="centered")
@@ -19,9 +19,19 @@ if st.button("문서 일괄 변환"):
     if not customer_name or not product_name:
         st.warning("고객사명과 제품명을 모두 입력해주세요.")
     else:
-        # 2. 날짜 포맷팅: 현재 날짜를 "Month DD, YYYY" 형식으로 변환 (첫 글자 대문자)
-        # %B는 로케일에 맞춰 영어의 경우 'December'와 같이 첫 글자가 대문자인 전체 월 이름을 반환합니다.
-        current_date = datetime.now().strftime("%B %d, %Y")
+        # 2. 날짜 포맷팅: 한국 시간(KST, UTC+9) 명시적 설정
+        kst = timezone(timedelta(hours=9))
+        current_time = datetime.now(kst)
+        
+        # 운영체제 언어 설정과 무관하게 항상 영문 월이 나오도록 리스트 매핑
+        english_months = [
+            "January", "February", "March", "April", "May", "June", 
+            "July", "August", "September", "October", "November", "December"
+        ]
+        month_name = english_months[current_time.month - 1]
+        
+        # "Month DD, YYYY" 형식으로 조립 (예: March 05, 2026)
+        current_date = f"{month_name} {current_time.strftime('%d, %Y')}"
         
         template_dir = "templates"
         
@@ -41,13 +51,16 @@ if st.button("문서 일괄 변환"):
                         file_path = os.path.join(template_dir, filename)
                         
                         try:
-                            # 템플릿 열기 및 변환 로직
+                            # 템플릿 열기
                             doc = DocxTemplate(file_path)
+                            
+                            # 변환할 데이터 매핑
                             context = {
                                 'DATE': current_date,
                                 'CUSTOMER': customer_name,
                                 'PRODUCT': product_name
                             }
+                            
                             # 문서 내 태그 렌더링 (치환)
                             doc.render(context)
                             
@@ -67,7 +80,7 @@ if st.button("문서 일괄 변환"):
             # ZIP 버퍼 포인터를 처음으로 되돌림
             zip_buffer.seek(0)
             
-            st.success("모든 파일이 성공적으로 변환되었습니다! 아래 버튼을 눌러 다운로드하세요.")
+            st.success(f"변환 완료! (적용된 날짜: {current_date}) 아래 버튼을 눌러 다운로드하세요.")
             
             # 다운로드 버튼 활성화
             st.download_button(
